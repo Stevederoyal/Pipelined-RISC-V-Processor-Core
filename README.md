@@ -20,38 +20,58 @@ Pipeline registers between each stage carry control and data signals forward, an
 
 ```
 pipelined_processor_top
-├── Fetch_Cycle           (IF stage)
-├── Decode_Cycle          (ID stage)
-│   └── Fetch_Decode_Top
-│       ├── control_unit_top_mod
-│       │   └── main_decoder_mod
-│       └── mux3by1 (mux4by1)
-├── Execute_Cycle         (EX stage)
-├── Memory_Cycle          (MEM stage)
-├── WriteBack_Cycle       (WB stage)
-└── hazard_unit           (forwarding + hazard detection)
+├── fetch : Fetch_Cycle
+│   ├── PC_MUX : mux2by1
+│   ├── Program_Counter : program_counter
+│   ├── Instruction_Memory : instruction_memory
+│   └── PC_adder : PC_Adder
+│
+├── decode : Decode_Cycle
+│   ├── control_unit : control_unit_top_mod
+│   │   ├── Main_Decoder : main_decoder_mod
+│   │   └── ALU_Decoder : alu_decoder
+│   ├── register_file : register_file
+│   └── sign_extension : sign_extend
+│
+├── execute : Execute_Cycle
+│   ├── srcAE_mux : mux4by1
+│   ├── srcBE_mux : mux4by1
+│   ├── alu_src_mux : mux2by1
+│   ├── alu : ALU
+│   └── branch_adder : PC_Adder
+│
+├── memory : Memory_Cycle
+│   └── dmem : data_memory
+│
+├── WriteBack : WriteBack_Cycle
+│   └── result_mux : mux2by1
+│
+├── Forwarding_block : hazard_unit
+│
+└── Memory File
+    └── memfile.mem
 ```
 
 ### Key components
 
-| Module | Responsibility |
-|---|---|
-| **Fetch_Cycle** | Fetches instructions from instruction memory; handles PC update and branch redirection |
-| **Decode_Cycle** | Decodes instructions, reads the register file, generates control signals |
-| **control_unit_top_mod / main_decoder_mod** | Generates control signals (RegWrite, ALUSrc, MemWrite, Branch, etc.) based on opcode/funct fields |
-| **Execute_Cycle** | Performs ALU operations, evaluates branch conditions, computes branch target address |
-| **Memory_Cycle** | Performs data memory reads/writes |
-| **WriteBack_Cycle** | Selects and writes the final result back to the register file |
-| **hazard_unit** | Detects data hazards and generates forwarding selects (ForwardAE/ForwardBE); detects control hazards from taken branches |
+| Module | Instance | Responsibility |
+|---|---|---|
+| **Fetch_Cycle** | `fetch` | Fetches instructions; updates PC via `PC_MUX`/`PC_Adder`, reads `instruction_memory` |
+| **Decode_Cycle** | `decode` | Decodes instructions, reads `register_file`, sign-extends immediates, generates control signals via `control_unit_top_mod` |
+| **control_unit_top_mod** | `control_unit` | Combines `main_decoder_mod` and `alu_decoder` outputs into pipeline control signals |
+| **Execute_Cycle** | `execute` | Performs ALU operations (via `alu`), selects forwarded operands (`srcAE_mux`/`srcBE_mux`), computes branch target (`branch_adder`) |
+| **Memory_Cycle** | `memory` | Reads/writes `data_memory` |
+| **WriteBack_Cycle** | `WriteBack` | Selects the final result (`result_mux`) and writes it back to the register file |
+| **hazard_unit** | `Forwarding_block` | Detects data hazards and generates forwarding selects (ForwardAE/ForwardBE); detects control hazards from taken branches |
 
 ## Hazard Handling
 
-- **Data hazards**: Resolved via ALU operand forwarding from the EX/MEM and MEM/WB pipeline stages, selected using 2-bit forwarding control signals (`ForwardAE`, `ForwardBE`).
-- **Control hazards**: Resolved via branch/PC-redirect logic — when a branch is taken in the Execute stage (`PCSrcE`), the Fetch stage is redirected to the computed branch target (`PCTargetE`).
+- **Data hazards**: Resolved via ALU operand forwarding from the EX/MEM and MEM/WB pipeline stages, selected using 2-bit forwarding control signals (`ForwardAE`, `ForwardBE`) feeding the `srcAE_mux`/`srcBE_mux` 4-to-1 muxes in Execute_Cycle.
+- **Control hazards**: Resolved via branch/PC-redirect logic — when a branch is taken in the Execute stage (`PCSrcE`), the Fetch stage's `PC_MUX` is redirected to the computed branch target (`PCTargetE`).
 
 ## Verification
 
-Functional correctness was verified by loading RISC-V programs into instruction memory and executing them in simulation, analyzing waveforms in Vivado to confirm correct pipeline behavior (register writes, memory accesses, and branch redirection) across all five stages.
+Functional correctness was verified by loading RISC-V programs (`memfile.mem`) into instruction memory and executing them in simulation, analyzing waveforms in Vivado to confirm correct pipeline behavior (register writes, memory accesses, and branch redirection) across all five stages.
 
 ## Tools
 
@@ -64,15 +84,25 @@ Functional correctness was verified by loading RISC-V programs into instruction 
 ├── rtl/
 │   ├── pipelined_processor_top.v
 │   ├── Fetch_Cycle.v
+│   ├── mux2by1.v
+│   ├── program_counter.v
+│   ├── instruction_memory.v
+│   ├── PC_Adder.v
 │   ├── Decode_Cycle.v
-│   ├── Fetch_Decode_Top.v
 │   ├── control_unit_top_mod.v
 │   ├── main_decoder_mod.v
-│   ├── mux3by1.v
+│   ├── alu_decoder.v
+│   ├── register_file.v
+│   ├── sign_extend.v
 │   ├── Execute_Cycle.v
+│   ├── mux3by1.v
+│   ├── ALU.v
 │   ├── Memory_Cycle.v
+│   ├── data_memory.v
 │   ├── WriteBack_Cycle.v
 │   └── hazard_unit.v
+├── sim/
+│   └── memfile.mem
 ├── docs/
 │   └── architecture.png
 └── README.md
