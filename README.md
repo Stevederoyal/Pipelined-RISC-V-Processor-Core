@@ -73,6 +73,16 @@ pipelined_processor_top
 
 Functional correctness was verified by loading RISC-V programs (`memfile.mem`) into instruction memory and executing them in simulation, analyzing waveforms in Vivado to confirm correct pipeline behavior (register writes, memory accesses, and branch redirection) across all five stages.
 
+## Simulation Results
+
+![Simulation Waveform](docs/Simulation_Results.png)
+
+The waveform above shows the pipeline executing a sequence of instructions, with signals grouped by stage (Fetch, Decode, Execute, Memory Access, Register Writeback). Key behavior visible in the trace:
+
+- **Instruction flow**: `RdE` → `RdM` → `RdW` shows the same destination register advancing one stage per clock cycle as each instruction moves through the pipeline.
+- **Forwarding in action**: `ForwardAE`/`ForwardBE` switch between `00`, `01`, and `10` as data hazards are detected, selecting the correct operand source (register file, EX/MEM, or MEM/WB) for `SrcAE`/`SrcBE`.
+- **Writeback**: `ResultW` and `RdW` confirm the correct value is written back to the register file each cycle once an instruction completes.
+
 ## Tools
 
 - **Simulator / Synthesis:** Xilinx Vivado
@@ -104,7 +114,8 @@ Functional correctness was verified by loading RISC-V programs (`memfile.mem`) i
 ├── sim/
 │   └── memfile.mem
 ├── docs/
-│   └── architecture.png
+│   ├── architecture.png
+│   └── Simulation_Results.png
 └── README.md
 ```
 
