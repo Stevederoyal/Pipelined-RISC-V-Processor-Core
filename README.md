@@ -67,7 +67,9 @@ pipelined_processor_top
 ## Hazard Handling
 
 - **Data hazards**: Resolved via ALU operand forwarding from the EX/MEM and MEM/WB pipeline stages, selected using 2-bit forwarding control signals (`ForwardAE`, `ForwardBE`) feeding the `srcAE_mux`/`srcBE_mux` 4-to-1 muxes in Execute_Cycle.
+- **Load-use hazards**: Detected when a load instruction in Execute (`ResultSrcE`) is immediately followed by a dependent instruction in Decode (`Rs1D`/`Rs2D` matching `RdE`). Since a load's result isn't available until the Memory stage, forwarding alone can't resolve it — the hazard unit asserts `StallF`/`StallD` to freeze Fetch and Decode for one cycle until the value becomes forwardable.
 - **Control hazards**: Resolved via branch/PC-redirect logic — when a branch is taken in the Execute stage (`PCSrcE`), the Fetch stage's `PC_MUX` is redirected to the computed branch target (`PCTargetE`).
+- **Flushing**: `FlushD` clears the Decode-stage pipeline register on a taken branch (`PCSrcE`), squashing the wrong-path instruction fetched before the branch resolved. `FlushE` clears the Execute-stage register on either a taken branch or a load-use stall, inserting a bubble so no instruction executes twice or on the wrong path.
 
 ## Verification
 
